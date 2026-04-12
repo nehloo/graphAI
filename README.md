@@ -21,39 +21,75 @@ The insight: **human-readable formats are lossy for AI consumption.** Prose cont
 ### The Pipeline
 
 ```
-RAW FILES (any format)
-    ↓
-EXTRACTION — Parse, chunk, extract entities and relationships
-    ↓
-GRAPH CONSTRUCTION — Build dual-graph with typed edges
-    ↓
-OPTIMIZATION — Deduplicate, prune, compress into hierarchical levels
-    ↓
-.gai FILES — Binary-packed, AI-native format (MessagePack)
-    ↓
-QUERY — Traverse graph, extract relevant subgraph, serialize for LLM
-    ↓
-ANSWER — LLM reasons over structured context with explicit relationships
+RAW FILES (any format)  ──>  DETERMINISTIC PIPELINE ($0)  ──>  DUAL GRAPH
+                                                                   |
+CONVERSATIONS  ─────────────────────────────────────>    TEMPORAL + IDENTITY LAYER
+                                                                   |
+                                                          LLM ENRICHMENT (optional)
+                                                                   |
+                                                          ENRICHED GRAPH (.gai)
+                                                        /      |        \
+                                                   QUERY    GIKI       AUDIT
+                                                     |    (pages)    (reports)
+                                                  ANSWER
+                                                     ^
+                                             HUMAN CORRECTIONS
 ```
+
+**Deterministic pipeline ($0):** Parsing, chunking, entity extraction, TF-IDF similarity, graph construction — all pure JS, zero API calls.
+
+**LLM enrichment (optional):** Adds synthesis (one-sentence insight), contextual explanation, and source quality annotation per node. Costs ~$0.50-2 per dataset.
+
+**Human corrections:** Add facts, edit nodes, supersede outdated info, or bulk-import markdown. Human-corrected nodes get maximum confidence (1.0).
+
+**Giki pages:** Human-readable topic pages auto-generated from the graph, with citations back to specific graph nodes.
+
+**Audit reports:** Entity breakdowns, contradiction detection, cross-domain discoveries, health dashboard, markdown export.
 
 ### The Dual-Graph Model
 
 Every piece of knowledge exists as a **node**. Nodes are connected by two types of edges:
 
-**Directed edges** (arrows — A → B) represent:
+**Directed edges** (arrows — A -> B) represent:
 - `contains` — a section contains a paragraph
 - `precedes` — one fact follows another in sequence
 - `cites` — one source references another
 - `defines` — a definition explains a concept used elsewhere
 - `causes`, `supports`, `contradicts` — causal and logical relationships
+- `supersedes` — new information replaces old (with provenance)
+- `discussed-in` — knowledge traced back to conversation origin
+- `knows`, `works-with`, `reports-to` — person relationships
 
-**Undirected edges** (lines — A ↔ B) represent:
+**Undirected edges** (lines — A <-> B) represent:
 - `similar-to` — two facts share vocabulary (measured by TF-IDF cosine similarity)
 - `shares-entity` — two facts mention the same person, place, or concept
 - `co-occurs` — two facts appear in the same section
-- `same-source` — two facts come from the same document
+- `same-person` — two mentions of the same person across sources
+- `related-to` — general association between people or concepts
 
-Both edge types exist over the **same node set**. A fact about Alan Turing might have a directed `precedes` edge to the next fact in the article, AND an undirected `shares-entity` edge to a fact about the Turing machine in a different article. This dual structure gives AI models richer reasoning paths than either graph type alone.
+Both edge types exist over the **same node set**. This dual structure gives AI models richer reasoning paths than either graph type alone.
+
+### Temporal Awareness
+
+Every node tracks:
+- `createdAt` — when the knowledge was first ingested
+- `lastAccessedAt` — when it was last retrieved in a query
+- `accessCount` — how many times it's been used
+- `validUntil` — optional expiration (for superseded information)
+- `confidence` — 0-1 score that decays over time if knowledge isn't reinforced
+
+The query engine applies temporal scoring: recently accessed nodes score higher, frequently used nodes score higher, expired nodes score 0.3x. Knowledge that isn't accessed for 7+ days begins to decay.
+
+### Conversation Memory
+
+graphAI ingests conversations (Claude, ChatGPT, Slack, raw text) into the same graph as domain knowledge. Each conversation turn becomes a node with `discussed-in` edges linking to the knowledge it references. This means the system remembers *what you discussed* alongside *what it knows*.
+
+### Identity Layer
+
+Person entities mentioned 2+ times across sources automatically get dedicated person nodes with:
+- Inferred attributes (role, organization) from surrounding content
+- Relationship edges between co-mentioned persons
+- User profile inference from conversation patterns
 
 ### The .gai Format
 
@@ -73,10 +109,11 @@ This isn't designed for humans to read. It's designed for AI to consume efficien
 
 When you ask a question:
 
-1. **Seed finding** — TF-IDF matching identifies the most relevant nodes (75ms avg across 12K nodes)
-2. **Graph traversal** — BFS from seed nodes along directed and undirected edges, with score decay per hop
-3. **Subgraph extraction** — Top 20 nodes + their connecting edges are collected
-4. **Serialization** — The subgraph is converted to a structured text format:
+1. **Query decomposition** — Complex questions are split into sub-queries; each is expanded with synonyms derived from the graph itself
+2. **Seed finding** — TF-IDF matching across all query variants identifies the most relevant nodes
+3. **Graph traversal** — BFS from seed nodes with temporal scoring (recency + frequency + confidence)
+4. **Subgraph extraction** — Top 20 nodes + connecting edges, including enriched synthesis when available
+5. **Serialization** — Structured format with explicit edges for LLM reasoning:
 
 ```
 === KNOWLEDGE SUBGRAPH (20 nodes, 58 edges) ===
@@ -90,9 +127,48 @@ n1 -[defines:0.9]-> n2
 
 --- UNDIRECTED ---
 n1 ~[similar-to:0.7]~ n2
+
+--- ENRICHED INSIGHTS ---
+[event|0.53] SYNTHESIS: Turing's 1936 paper laid the theoretical foundation for all computation
+  CONTEXT: This event preceded physical computers by a decade and connects to Church's lambda calculus
 ```
 
-5. **LLM reasoning** — The AI receives this structured context and can follow edges for causal, temporal, and associative reasoning — rather than guessing connections from flat text.
+## Prior Art & What's Different
+
+Graph-based RAG is an active research area. Microsoft's **GraphRAG** (2025) pioneered community detection and hierarchical summaries on knowledge graphs. **LightRAG** (EMNLP 2025) introduced dual-level retrieval combining entity extraction with abstract reasoning. **LazyGraphRAG** achieved 700x query cost reduction vs GraphRAG.
+
+graphAI's contribution is a specific combination that hasn't been published as a unified system:
+
+- **Dual-graph** (directed + undirected edges over the same node set) — most systems use one graph type
+- **AI-native binary format** (.gai) optimized for machine consumption, not human readability
+- **Zero-API graph construction** (TF-IDF, no embeddings required) — $0 to build the graph
+- **Human audit trail** — giki pages with node citations, contradiction detection, correction API
+- **Temporal awareness** — confidence decay, supersedes edges, access tracking per node
+- **Identity layer** — automatic person extraction, relationship edges, user profile inference
+- **Reflection engine** — automated contradiction detection, cross-domain discovery, transitive edge inference
+
+No single technique here is new. The novelty is the combination into a unified, open-source system.
+
+## Landscape Comparison
+
+graphAI exists alongside other approaches to persistent AI knowledge. Each makes different tradeoffs:
+
+| | **graphAI** | **GBrain** (Garry Tan) | **MemPalace** (Milla Jovovich) | **Karpathy Wiki** |
+|---|---|---|---|---|
+| **Representation** | Dual-graph (.gai binary) | Markdown files in git | Spatial hierarchy + ChromaDB | Markdown wiki pages |
+| **Conversation memory** | Yes (Claude/ChatGPT/Slack) | No | Yes (core feature) | No |
+| **Identity tracking** | Auto-extracted person nodes | Manual (people/ dir) | No | Partial (entity pages) |
+| **Contradiction detection** | Automated | No | No | LLM lint (manual) |
+| **LLM cost to build** | $0 + optional enrichment | ~$5-20/dataset | $0 | ~$10-50/dataset |
+| **Human auditability** | Giki pages + audit export | Native (markdown) | Partial | Native (wiki) |
+| **Relationships** | Explicit typed edges | Implicit links | Tunnels | Implicit cross-refs |
+| **Persistence** | SQLite + .gai files | Git repo | ChromaDB + SQLite | Filesystem |
+
+**Where graphAI wins:** Relationship-aware reasoning, multi-source knowledge fusion, token efficiency, automated contradiction detection.
+
+**Where others win:** GBrain has native git version control. MemPalace has battle-tested conversation recall (96.6% LongMemEval). Karpathy's pattern produces richer narrative synthesis.
+
+**They complement each other:** MemPalace for conversation memory, GBrain for personal knowledge management, graphAI for structured domain knowledge with explicit relationships.
 
 ## Why This Matters (vs. Standard RAG)
 
@@ -100,9 +176,12 @@ n1 ~[similar-to:0.7]~ n2
 |--------|-------------|---------|
 | Context format | Flat text chunks | Structured subgraph with typed edges |
 | Relationships | Implicit (AI must infer) | Explicit (edges with types and weights) |
-| Retrieval | Vector similarity on chunks | Graph traversal from seed nodes |
+| Retrieval | Vector similarity on chunks | Graph traversal + synonym expansion + query decomposition |
 | Resolution | Fixed chunk size | Hierarchical (zoom in/out via compression levels) |
 | Dependencies | Requires embedding API | TF-IDF (pure JS, zero API calls for graph construction) |
+| Memory | Stateless per session | Temporal nodes + conversation ingestion + SQLite persistence |
+| Corrections | Re-ingest from scratch | In-place edit, supersede, or soft-delete individual nodes |
+| Auditability | None | Giki pages, audit reports, contradiction detection |
 
 ## Proof-of-Concept Datasets
 
@@ -138,34 +217,56 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open http://localhost:3000, go to **Examples**, load a dataset, then explore the **Graph** visualization or query it from **Chat**.
+Open http://localhost:3000 and use the navigation:
+
+| Page | Purpose |
+|------|---------|
+| **Dashboard** | Graph stats, node/edge type breakdowns |
+| **Examples** | Load proof-of-concept datasets (Wikipedia, arXiv, Next.js, NASA) |
+| **Graph** | Force-directed visualization with node inspector |
+| **Chat** | Query the graph with optional subgraph context panel |
+| **Correct** | Add facts, edit nodes, supersede info, bulk-import markdown |
+| **Giki** | Browse auto-generated topic pages with node citations |
+| **Audit** | Entity reports, contradictions, health dashboard, markdown export |
+| **Benchmarks** | Query performance metrics across 10 test queries |
 
 ## Project Structure
 
 ```
 src/
   core/
-    types.ts                    # All TypeScript interfaces
-    constants.ts                # Thresholds, magic bytes, stopwords
-    ingestion/parsers/          # Markdown, PDF, HTML, CSV/JSON parsers
-    extraction/                 # Chunker, entity extractor
-    similarity/                 # TF-IDF, cosine, Jaccard (pure JS)
-    graph/                      # Graph builder, directed/undirected edges, incremental updates
-    optimization/               # Deduplicator, pruner, hierarchical compressor
-    format/                     # .gai binary writer/reader (MessagePack)
-    query/                      # Seed finder, BFS traverser, subgraph serializer
-  examples/                     # Wikipedia, arXiv, Next.js docs, NASA Mars fetchers
-  app/                          # Next.js App Router pages + API routes
+    types.ts                        # All TypeScript interfaces (40+ types)
+    constants.ts                    # Thresholds, magic bytes, stopwords
+    ingestion/parsers/              # Markdown, PDF, HTML, CSV/JSON, conversation parsers
+    extraction/                     # Chunker, entity extractor, identity extractor
+    similarity/                     # TF-IDF, cosine, Jaccard (pure JS)
+    graph/                          # Graph builder, directed/undirected edges, incremental updates
+    optimization/                   # Deduplicator, pruner, hierarchical compressor, reflection engine
+    format/                         # .gai binary writer/reader (MessagePack)
+    query/                          # Seed finder, BFS traverser, subgraph serializer,
+                                    # synonym expander, query decomposer
+    enrichment/                     # LLM-powered node synthesis + context
+    corrections/                    # Human correction engine (add/edit/supersede/delete)
+    giki/                           # Graph-to-wiki page generator with citations
+    audit/                          # Audit report generator + markdown exporter
+    persistence/                    # SQLite store (better-sqlite3, WAL mode)
+  examples/                         # Wikipedia, arXiv, Next.js docs, NASA Mars fetchers
+  app/                              # Next.js App Router — 8 pages + 10 API routes
+tests/
+  longmemeval/                      # LongMemEval benchmark suite (12 tests, 4 categories)
 ```
 
 ## Tech Stack
 
-- **Next.js 15** (App Router, TypeScript)
+- **Next.js 16** (App Router, TypeScript)
 - **Vercel AI SDK v6** (chat interface, streaming)
 - **MessagePack** (`msgpackr`) for .gai binary format
 - **TF-IDF + cosine similarity** (pure JS, no embedding APIs)
+- **better-sqlite3** for persistent graph storage (WAL mode)
 - **react-force-graph-2d** for graph visualization
 - **Tailwind CSS** for UI
+
+All dependencies are MIT or Apache-2.0 licensed. No GPL/LGPL/AGPL.
 
 ## License
 
@@ -177,5 +278,6 @@ This is an active research project exploring AI-native knowledge representation.
 - New parser types (DOCX, PPTX, audio transcripts)
 - Improved relation extraction (NLP-based `causes`, `contradicts` detection)
 - Embedding-based similarity as optional upgrade to TF-IDF
-- Benchmark comparisons against standard RAG pipelines
+- Benchmark comparisons against standard RAG pipelines (GraphRAG, LightRAG)
 - Multi-graph merge (combine multiple .gai files)
+- Giki page quality improvements (LLM-assisted narrative generation)
