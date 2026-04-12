@@ -1,0 +1,40 @@
+{
+  "name": "graphai",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^3.0.52",
+    "@ai-sdk/react": "^3.0.160",
+    "ai": "^6.0.158",
+    "cheerio": "^1.1.0",
+    "msgpackr": "^1.11.9",
+    "nanoid": "^5.1.7",
+    "next": "16.2.3",
+    "papaparse": "^5.5.3",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-force-graph-2d": "^1.29.1",
+    "remark": "^15.0.1",
+    "remark-parse": "^11.0.0",
+    "unified": "^11.0.5",
+    "wtf_wikipedia": "^10.4.1",
+    "xxhash-wasm": "^1.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/papaparse": "^5.5.2",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.3",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
