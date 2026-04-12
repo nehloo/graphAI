@@ -15,7 +15,14 @@ export type NodeType =
   | 'claim'
   | 'data-point'
   | 'section'
-  | 'document';
+  | 'document'
+  // Identity types (Step 3)
+  | 'person'
+  | 'organization'
+  | 'preference'
+  // Conversation types (Step 2)
+  | 'conversation'
+  | 'message';
 
 export interface SourceReference {
   file: string;
@@ -34,6 +41,11 @@ export interface GraphNode {
   metadata: Record<string, string | number>;
   level: number; // Hierarchy level (0 = leaf, 1+ = summary)
   confidence: number; // 0-1, extraction confidence
+  // Temporal fields (Step 1)
+  createdAt: number; // Timestamp of node creation
+  lastAccessedAt: number; // Last time this node was retrieved in a query
+  accessCount: number; // How many times retrieved
+  validUntil?: number; // If set, node is considered expired after this timestamp
 }
 
 // --- Edge Types ---
@@ -46,14 +58,25 @@ export type DirectedEdgeType =
   | 'defines'
   | 'cites'
   | 'contradicts'
-  | 'supports';
+  | 'supports'
+  // Temporal & identity edges
+  | 'supersedes' // New info replaces old (old → new)
+  | 'discussed-in' // Knowledge node → conversation it came from
+  | 'knows' // Person → person
+  | 'works-with' // Person → person (professional)
+  | 'reports-to' // Person → person (hierarchy)
+  | 'collaborated-on' // Person → document/concept
+  | 'prefers'; // User → concept/preference
 
 export type UndirectedEdgeType =
   | 'similar-to'
   | 'co-occurs'
   | 'shares-entity'
   | 'shares-topic'
-  | 'same-source';
+  | 'same-source'
+  // Identity edges
+  | 'same-person' // Two mentions of the same person across sources
+  | 'related-to'; // General relationship between people/concepts
 
 export interface DirectedEdge {
   id: EdgeId;
@@ -62,6 +85,7 @@ export interface DirectedEdge {
   type: DirectedEdgeType;
   weight: number; // 0-1
   evidence?: string;
+  createdAt?: number;
 }
 
 export interface UndirectedEdge {
@@ -69,6 +93,7 @@ export interface UndirectedEdge {
   nodes: [NodeId, NodeId];
   type: UndirectedEdgeType;
   weight: number; // 0-1
+  createdAt?: number;
 }
 
 // --- Graph ---
@@ -81,6 +106,8 @@ export interface GraphMetadata {
   directedEdgeCount: number;
   undirectedEdgeCount: number;
   version: number;
+  conversationCount?: number;
+  personCount?: number;
 }
 
 export interface KnowledgeGraph {
@@ -169,4 +196,65 @@ export interface TfidfIndex {
   documents: Map<NodeId, Map<string, number>>; // nodeId -> term -> tfidf weight
   idf: Map<string, number>; // term -> idf value
   documentCount: number;
+}
+
+// --- Conversation Types (Step 2) ---
+
+export interface ConversationMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp?: number;
+}
+
+export interface ParsedConversation {
+  id: string;
+  title: string;
+  messages: ConversationMessage[];
+  sourceFile: string;
+  startedAt: number;
+  format: 'claude' | 'chatgpt' | 'slack' | 'raw';
+  metadata: Record<string, string | number>;
+}
+
+// --- Identity Types (Step 3) ---
+
+export interface PersonProfile {
+  nodeId: NodeId;
+  name: string;
+  aliases: string[]; // Alternative names/handles
+  attributes: Record<string, string>; // role, company, email, etc.
+  firstMentionedAt: number;
+  lastMentionedAt: number;
+  mentionCount: number;
+}
+
+export interface UserProfile {
+  nodeId: NodeId;
+  preferences: Map<string, number>; // concept → affinity score
+  communicationStyle: {
+    prefersBullets: boolean;
+    prefersDetail: 'concise' | 'detailed' | 'unknown';
+    technicalDepth: 'beginner' | 'intermediate' | 'expert' | 'unknown';
+  };
+  domains: string[]; // Topics the user frequently asks about
+  inferredAt: number;
+}
+
+// --- Reflection Types (Step 5) ---
+
+export interface Contradiction {
+  nodeA: NodeId;
+  nodeB: NodeId;
+  sharedEntities: string[];
+  description: string;
+  detectedAt: number;
+  resolved: boolean;
+}
+
+export interface ConnectionDiscovery {
+  nodeA: NodeId;
+  nodeB: NodeId;
+  bridgeEntities: string[];
+  surprise: number; // 0-1, how unexpected this connection is
+  discoveredAt: number;
 }

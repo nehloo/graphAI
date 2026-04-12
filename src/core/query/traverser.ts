@@ -96,6 +96,42 @@ export function traverseGraph(
     }
   }
 
+  // Apply temporal scoring boost: recently accessed and frequently accessed nodes score higher
+  const now = Date.now();
+  const ONE_DAY = 86_400_000;
+
+  for (const [nodeId, baseScore] of nodeScores) {
+    const node = graph.nodes.get(nodeId);
+    if (!node) continue;
+
+    let temporalMultiplier = 1.0;
+
+    // Recency boost: nodes accessed in the last 24h get up to 1.3x
+    if (node.lastAccessedAt) {
+      const daysSinceAccess = (now - node.lastAccessedAt) / ONE_DAY;
+      if (daysSinceAccess < 1) temporalMultiplier *= 1.3;
+      else if (daysSinceAccess < 7) temporalMultiplier *= 1.1;
+    }
+
+    // Frequency boost: heavily accessed nodes get up to 1.2x
+    if (node.accessCount > 10) temporalMultiplier *= 1.2;
+    else if (node.accessCount > 3) temporalMultiplier *= 1.1;
+
+    // Confidence factor: low-confidence (decayed) nodes score lower
+    temporalMultiplier *= node.confidence;
+
+    // Skip expired nodes
+    if (node.validUntil && now > node.validUntil) {
+      temporalMultiplier *= 0.3;
+    }
+
+    nodeScores.set(nodeId, baseScore * temporalMultiplier);
+
+    // Update access stats
+    node.lastAccessedAt = now;
+    node.accessCount++;
+  }
+
   // Collect top-K nodes by score
   const sortedNodes = Array.from(nodeScores.entries())
     .sort((a, b) => b[1] - a[1])

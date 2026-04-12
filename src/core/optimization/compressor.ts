@@ -132,6 +132,9 @@ export function compressGraph(graph: KnowledgeGraph): {
       },
       level: 1,
       confidence: 0.8,
+      createdAt: Date.now(),
+      lastAccessedAt: Date.now(),
+      accessCount: 0,
     };
 
     graph.nodes.set(summaryNodeId, summaryNode);

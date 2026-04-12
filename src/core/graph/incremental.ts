@@ -53,6 +53,9 @@ export function addDocumentsToGraph(
       metadata: chunk.metadata,
       level: 0,
       confidence: 0.9,
+      createdAt: Date.now(),
+      lastAccessedAt: Date.now(),
+      accessCount: 0,
     });
   }
 

@@ -38,6 +38,9 @@ export function buildGraph(documents: ParsedDocument[], graphName: string): Know
       metadata: chunk.metadata,
       level: 0,
       confidence: 0.9, // Default confidence for extracted content
+      createdAt: Date.now(),
+      lastAccessedAt: Date.now(),
+      accessCount: 0,
     });
   }
 

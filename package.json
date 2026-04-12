@@ -12,6 +12,7 @@
     "@ai-sdk/openai": "^3.0.52",
     "@ai-sdk/react": "^3.0.160",
     "ai": "^6.0.158",
+    "better-sqlite3": "^12.8.0",
     "cheerio": "^1.1.0",
     "msgpackr": "^1.11.9",
     "nanoid": "^5.1.7",
@@ -29,6 +30,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
