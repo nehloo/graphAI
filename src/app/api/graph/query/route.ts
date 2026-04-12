@@ -5,7 +5,9 @@ import { queryGraph, buildGraphPrompt } from '@/core/query/query-engine';
 export async function POST(request: Request) {
   const { messages } = await request.json();
   const lastMessage = messages[messages.length - 1];
-  const question = lastMessage.content;
+
+  // Extract text from v6 UIMessage parts, falling back to content for compatibility
+  const question = extractText(lastMessage);
 
   const graphData = getGraph();
   if (!graphData || !graphData.tfidfIndex) {
@@ -16,7 +18,7 @@ export async function POST(request: Request) {
   }
 
   // Query the graph to get relevant subgraph
-  const { subgraph, seeds } = queryGraph(graphData, graphData.tfidfIndex, question);
+  const { subgraph } = queryGraph(graphData, graphData.tfidfIndex, question);
 
   // Build the prompt with graph context
   const systemPrompt = buildGraphPrompt(subgraph.serialized, question);
@@ -29,4 +31,20 @@ export async function POST(request: Request) {
   });
 
   return result.toUIMessageStreamResponse();
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractText(message: any): string {
+  // v6 format: message.parts[].text
+  if (message.parts && Array.isArray(message.parts)) {
+    return message.parts
+      .filter((p: { type: string }) => p.type === 'text')
+      .map((p: { text: string }) => p.text)
+      .join(' ');
+  }
+  // v5 fallback: message.content
+  if (typeof message.content === 'string') {
+    return message.content;
+  }
+  return '';
 }
