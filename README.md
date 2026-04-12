@@ -12,9 +12,23 @@ The result: faster retrieval, richer reasoning, and answers that trace back thro
 
 > *"Are AI models based on non-oriented graphs?"*
 
-This question led to an exploration: if AI models internally process information through graph-like structures, could we *externally* represent knowledge the same way? Not as markdown files humans read, but as graph structures AI models traverse?
+That question — asked casually in a conversation with an AI — unlocked something that had been sitting dormant for decades.
 
-The insight: **human-readable formats are lossy for AI consumption.** Prose contains redundant phrasing, implicit relationships, linear structure that hides non-linear connections, and ambiguity that humans resolve with world knowledge but AI must guess at. A purpose-built AI-native format could be dramatically more efficient.
+I first wrote code in 1990. Basic language, on a Sintez ZX Spectrum clone connected to a TV set and a tape cassette, in Romania. A few years later, at an Informatics high school, I learned about directed and undirected graphs — oriented and non-oriented, as we called them. They were elegant. They made sense in a way that linear data structures didn't. But at the time, there wasn't much you could do with them beyond textbook exercises.
+
+In the late 1990s, I wrote a C++ class built around machine learning concepts — a neural network training loop that would take a sketchy, hand-drawn letter as input, run it through repeated training cycles, and process the output until the system recognized what the letter was supposed to be. It worked. It felt like the future. But the future wasn't ready yet.
+
+In the early 2000s, I explored treating electrical harnesses as undirected graphs — modeling the physical wiring of circuits as graph structures to enable faster comprehension and 3D routing of complex harness designs. The concept showed promise, but it was left unexplored. Other things took priority.
+
+Over the years, I explored many startup ideas and concepts across different domains — software, music, events, nonprofits, research. Each one taught something. None of them brought all the threads together.
+
+Then came that question about AI and graphs. And suddenly, everything connected.
+
+The graphs from high school. The neural network from C++. The harness routing from engineering. The startup instinct from years of building things. The realization that AI models might process knowledge more effectively through the same structures I'd been thinking about since I was a teenager — not as human-readable text, but as typed, weighted, traversable graphs.
+
+**The insight: human-readable formats are lossy for AI consumption.** Prose contains redundant phrasing, implicit relationships, linear structure that hides non-linear connections, and ambiguity that humans resolve with world knowledge but AI must guess at. A purpose-built AI-native format could be dramatically more efficient.
+
+graphAI is what happens when three decades of scattered ideas finally find their moment.
 
 ## How It Works
 
