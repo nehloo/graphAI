@@ -10,13 +10,13 @@ The result: faster retrieval, richer reasoning, and answers that trace back thro
 
 ## The Question That Started This
 
-> *"Are AI models based on non-oriented graphs?"*
+> *["Are AI models based on non-oriented graphs?"](original-discussion.md)*
 
 That question — asked casually in a conversation with an AI — unlocked something that had been sitting dormant for decades.
 
 I first wrote code in 1990. Basic language, on a Sintez ZX Spectrum clone connected to a TV set and a tape cassette, in Romania. A few years later, at an Informatics high school, I learned about directed and undirected graphs — oriented and non-oriented, as we called them. They were elegant. They made sense in a way that linear data structures didn't. But at the time, there wasn't much you could do with them beyond textbook exercises.
 
-In the late 1990s, I wrote a C++ class built around machine learning concepts — a neural network training loop that would take a sketchy, hand-drawn letter as input, run it through repeated training cycles, and process the output until the system recognized what the letter was supposed to be. It worked. It felt like the future. But the future wasn't ready yet.
+In the late 1990s, I wrote a C++ class built around machine learning concepts — a neural network training loop that would take a sketchy, hand-drawn letter as input (drawn using a pixel editor I'd built — the [EditIcon](https://github.com/nehloo/EditIcon) project preserves that early tool), run it through repeated training cycles, and process the output until the system recognized what the letter was supposed to be. It worked. It felt like the future. But the future wasn't ready yet.
 
 In the early 2000s, I explored treating electrical harnesses as undirected graphs — modeling the physical wiring of circuits as graph structures to enable faster comprehension and 3D routing of complex harness designs. The concept showed promise, but it was left unexplored. Other things took priority.
 
@@ -30,7 +30,7 @@ The graphs from high school. The neural network from C++. The harness routing fr
 
 graphAI is what happens when three decades of scattered ideas finally find their moment.
 
-## How It Works
+## How graphAI Works for AI
 
 ### The Pipeline
 
@@ -105,7 +105,7 @@ Person entities mentioned 2+ times across sources automatically get dedicated pe
 - Relationship edges between co-mentioned persons
 - User profile inference from conversation patterns
 
-### The .gai Format
+# The .gai Format
 
 Instead of storing knowledge as human-readable markdown, graphAI uses a binary format (`.gai`) built on MessagePack:
 
