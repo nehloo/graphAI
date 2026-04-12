@@ -23,6 +23,7 @@ const navItems = [
   { href: "/examples", label: "Examples" },
   { href: "/graph", label: "Graph" },
   { href: "/chat", label: "Chat" },
+  { href: "/benchmark", label: "Benchmarks" },
 ];
 
 export default function RootLayout({
