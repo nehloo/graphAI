@@ -10,6 +10,7 @@ import { chunkDocument } from '@/core/extraction/chunker';
 import { createTfidfIndex, addDocument, computeIdf } from '@/core/similarity/tfidf';
 import { buildDirectedEdges, chunkKey } from './directed-edges';
 import { buildUndirectedEdges } from './undirected-edges';
+import { pruneGraph } from '@/core/optimization/pruner';
 
 export function buildGraph(documents: ParsedDocument[], graphName: string): KnowledgeGraph {
   // Step 1: Chunk all documents
@@ -96,6 +97,17 @@ export function buildGraph(documents: ParsedDocument[], graphName: string): Know
       version: 1,
     },
   };
+
+  // Step 7: Auto-prune orphan nodes and low-weight edges
+  const { prunedEdges, prunedNodes } = pruneGraph(graph, {
+    minDirectedWeight: 0.05,
+    minUndirectedWeight: 0.1,
+    removeOrphans: true,
+  });
+
+  if (prunedNodes > 0 || prunedEdges > 0) {
+    console.log(`[graphAI] Pruned ${prunedNodes} orphan nodes, ${prunedEdges} low-weight edges`);
+  }
 
   return { ...graph, tfidfIndex } as KnowledgeGraph & { tfidfIndex: typeof tfidfIndex };
 }

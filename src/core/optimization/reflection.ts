@@ -58,11 +58,17 @@ function detectContradictions(
 ): Contradiction[] {
   const contradictions: Contradiction[] = [];
 
-  // Group nodes by shared entities
+  // Group nodes by shared MEANINGFUL entities (skip short/generic ones)
   const entityNodes = new Map<string, NodeId[]>();
   for (const [nodeId, node] of graph.nodes) {
     if (node.type === 'document' || node.type === 'section' || node.type === 'person') continue;
+    if (node.content.length < 50) continue; // Skip very short nodes
     for (const entity of node.entities) {
+      // Skip generic entities: single words, numbers, short terms
+      if (entity.length < 4) continue;
+      if (/^\d+$/.test(entity)) continue;
+      if (GENERIC_TERMS.has(entity.toLowerCase())) continue;
+
       const list = entityNodes.get(entity) || [];
       list.push(nodeId);
       entityNodes.set(entity, list);
@@ -71,23 +77,30 @@ function detectContradictions(
 
   // For each entity, compare nodes that mention it
   for (const [entity, nodeIds] of entityNodes) {
-    if (nodeIds.length < 2 || nodeIds.length > 50) continue;
+    if (nodeIds.length < 2 || nodeIds.length > 30) continue;
 
     for (let i = 0; i < nodeIds.length; i++) {
-      for (let j = i + 1; j < Math.min(i + 10, nodeIds.length); j++) {
+      for (let j = i + 1; j < Math.min(i + 5, nodeIds.length); j++) {
         const nodeA = graph.nodes.get(nodeIds[i])!;
         const nodeB = graph.nodes.get(nodeIds[j])!;
 
-        // Check if they have high entity overlap but low content similarity
-        // (different things said about the same entities = potential contradiction)
+        // Both nodes must have substantial content
+        if (nodeA.content.length < 60 || nodeB.content.length < 60) continue;
+
+        // Need at least 2 shared meaningful entities (not just one)
+        const sharedEntities = nodeA.entities.filter(e =>
+          e.length >= 4 && nodeB.entities.some(be => be.toLowerCase() === e.toLowerCase())
+        );
+        if (sharedEntities.length < 2) continue;
+
         const entityOverlap = jaccardSimilarity(nodeA.entities, nodeB.entities);
         const vecA = getTfidfVector(tfidfIndex, nodeIds[i]);
         const vecB = getTfidfVector(tfidfIndex, nodeIds[j]);
         const contentSim = cosineSimilarity(vecA, vecB);
 
         // High entity overlap + low content similarity = potential contradiction
-        if (entityOverlap > 0.5 && contentSim < 0.2) {
-          // Check for opposing claim signals
+        // Tighter thresholds: overlap > 0.6 (was 0.5), similarity < 0.15 (was 0.2)
+        if (entityOverlap > 0.6 && contentSim < 0.15) {
           const hasConflict = detectConflictSignals(nodeA.content, nodeB.content);
           if (hasConflict) {
             contradictions.push({
@@ -302,3 +315,16 @@ function inferEdges(graph: KnowledgeGraph): number {
 
   return inferred;
 }
+
+// Generic terms that should not trigger contradiction detection
+const GENERIC_TERMS = new Set([
+  'first', 'second', 'third', 'last', 'new', 'old', 'next', 'previous',
+  'general', 'special', 'common', 'standard', 'modern', 'early', 'late',
+  'large', 'small', 'high', 'low', 'long', 'short', 'major', 'minor',
+  'important', 'significant', 'similar', 'different', 'various', 'several',
+  'many', 'most', 'some', 'other', 'such', 'based', 'used', 'known',
+  'called', 'named', 'given', 'made', 'found', 'developed', 'designed',
+  'published', 'released', 'introduced', 'proposed', 'described',
+  'gaussian', 'linear', 'digital', 'analog', 'binary', 'parallel',
+  'system', 'model', 'method', 'process', 'program', 'device',
+]);
