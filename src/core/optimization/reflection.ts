@@ -136,25 +136,33 @@ function detectConflictSignals(contentA: string, contentB: string): boolean {
   const a = contentA.toLowerCase();
   const b = contentB.toLowerCase();
 
-  // Check for negation patterns
-  const negations = ['not', 'never', 'no longer', 'stopped', 'ended', 'replaced', 'instead',
-    'unlike', 'contrary', 'however', 'but', 'although', 'despite', 'failed'];
+  // Only flag actual contradictory claims — not just any text with negation words.
+  // Require STRONG conflict signals: explicit disagreement or correction patterns.
 
-  const aHasNeg = negations.some(n => a.includes(n));
-  const bHasNeg = negations.some(n => b.includes(n));
+  const strongConflictPatterns = [
+    /\bnot\s+(?:a|an|the)\s/,       // "not a planet" vs "is a planet"
+    /\bno longer\b/,                  // "no longer considered"
+    /\bwas\s+(?:not|never)\b/,       // "was not invented by"
+    /\breplaced\s+by\b/,             // "replaced by X" vs "still uses Y"
+    /\bcontrary\s+to\b/,            // "contrary to popular belief"
+    /\bis\s+(?:incorrect|wrong|false|inaccurate)\b/,
+    /\bwas\s+(?:incorrect|wrong|false|inaccurate)\b/,
+    /\breclassified\b/,
+    /\bdisputed\b/,
+    /\bdisproven\b/,
+  ];
 
-  // One has negation signal, the other doesn't
-  if (aHasNeg !== bHasNeg) return true;
+  const aHasStrong = strongConflictPatterns.some(p => p.test(a));
+  const bHasStrong = strongConflictPatterns.some(p => p.test(b));
 
-  // Check for conflicting numbers/dates about the same subject
-  const numbersA: string[] = a.match(/\b\d{4}\b/g) || [];
-  const numbersB: string[] = b.match(/\b\d{4}\b/g) || [];
-  if (numbersA.length > 0 && numbersB.length > 0) {
-    const overlap = numbersA.filter(n => numbersB.includes(n));
-    if (overlap.length === 0 && numbersA.length + numbersB.length > 2) return true;
-  }
+  // At least one side must have a strong conflict signal
+  if (!aHasStrong && !bHasStrong) return false;
 
-  return false;
+  // AND the other side must make a positive claim about the same subject
+  // (having a strong signal alone isn't enough — both sides need substance)
+  if (a.length < 80 || b.length < 80) return false;
+
+  return true;
 }
 
 // Find surprising connections between nodes in different domains/sources

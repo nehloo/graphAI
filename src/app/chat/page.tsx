@@ -22,18 +22,27 @@ export default function ChatPage() {
   const [context, setContext] = useState<SubgraphContext | null>(null);
   const isActive = status === "streaming" || status === "submitted";
 
-  // Fetch subgraph context when a new user message is sent
+  // Track which user message we last fetched context for
+  const [lastContextMsgId, setLastContextMsgId] = useState<string | null>(null);
+
+  // Fetch subgraph context only when a NEW user message appears (not on every stream token)
   useEffect(() => {
+    if (!showContext) return;
+
     const userMessages = messages.filter((m) => m.role === "user");
     if (userMessages.length === 0) return;
 
     const lastUserMsg = userMessages[userMessages.length - 1];
+    if (lastUserMsg.id === lastContextMsgId) return; // Already fetched for this message
+
     const text = lastUserMsg.parts
       .filter((p) => p.type === "text")
       .map((p) => p.text)
       .join("");
 
     if (!text) return;
+
+    setLastContextMsgId(lastUserMsg.id);
 
     fetch("/api/graph/context", {
       method: "POST",
@@ -43,7 +52,7 @@ export default function ChatPage() {
       .then((r) => r.json())
       .then((data) => setContext(data))
       .catch(() => {});
-  }, [messages]);
+  }, [messages, showContext, lastContextMsgId]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
