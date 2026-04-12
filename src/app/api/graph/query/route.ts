@@ -1,4 +1,5 @@
 import { streamText } from 'ai';
+import { openai } from '@ai-sdk/openai';
 import { getGraph } from '@/core/graph/graph-store';
 import { queryGraph, buildGraphPrompt } from '@/core/query/query-engine';
 
@@ -6,7 +7,7 @@ export async function POST(request: Request) {
   const { messages } = await request.json();
   const lastMessage = messages[messages.length - 1];
 
-  // Extract text from v6 UIMessage parts, falling back to content for compatibility
+  // Extract text from the last user message
   const question = extractText(lastMessage);
 
   const graphData = getGraph();
@@ -23,11 +24,14 @@ export async function POST(request: Request) {
   // Build the prompt with graph context
   const systemPrompt = buildGraphPrompt(subgraph.serialized, question);
 
+  // Manually convert UIMessages (parts-based) to ModelMessages (content-based)
+  const modelMessages = messages.map(toModelMessage);
+
   // Stream the response using Vercel AI SDK v6
   const result = streamText({
-    model: 'openai/gpt-5.4',
+    model: openai('gpt-4o-mini'),
     system: systemPrompt,
-    messages,
+    messages: modelMessages,
   });
 
   return result.toUIMessageStreamResponse();
@@ -35,16 +39,23 @@ export async function POST(request: Request) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractText(message: any): string {
-  // v6 format: message.parts[].text
   if (message.parts && Array.isArray(message.parts)) {
     return message.parts
       .filter((p: { type: string }) => p.type === 'text')
       .map((p: { text: string }) => p.text)
       .join(' ');
   }
-  // v5 fallback: message.content
   if (typeof message.content === 'string') {
     return message.content;
   }
   return '';
+}
+
+// Convert a UIMessage (v6 parts format) to a ModelMessage (content format)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toModelMessage(msg: any): { role: string; content: string } {
+  return {
+    role: msg.role,
+    content: extractText(msg),
+  };
 }
