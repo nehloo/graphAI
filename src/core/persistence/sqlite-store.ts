@@ -10,7 +10,7 @@ import type {
 import { fromSerializable, toSerializable } from '@/core/graph/graph-store';
 import path from 'path';
 
-const DB_PATH = path.join(process.cwd(), 'data', 'graphai.db');
+const DB_PATH = path.join(process.cwd(), 'data', 'graphnosis.db');
 
 let db: Database.Database | null = null;
 

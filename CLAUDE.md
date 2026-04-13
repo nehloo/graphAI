@@ -1,4 +1,4 @@
-# Bignosis — Project Context
+# Graphnosis — Project Context
 
 ## What This Is
 A research prototype exploring AI-native knowledge representation through dual-graph structures.
@@ -18,7 +18,7 @@ RAW FILES → PARSE → CHUNK → EXTRACT → BUILD GRAPH → OPTIMIZE → .gai
 - **Similarity:** TF-IDF + cosine (pure JS, zero API calls) with inverted term index optimization
 - **Query:** synonym expansion → query decomposition → merged seed finding → BFS with temporal scoring → enriched subgraph serialization
 - **Persistence:** SQLite (better-sqlite3, WAL mode) or in-memory
-- **Format:** .gai binary (MessagePack with magic bytes + checksum)
+- **Format:** .gai binary — "Graphnosis AI" knowledge format (MessagePack with magic bytes + checksum)
 
 ## Key Technical Decisions
 - AI SDK v6: `useChat` from `@ai-sdk/react`, `DefaultChatTransport` for custom API URL, `sendMessage({text})`, `status` not `isLoading`, `msg.parts` not `msg.content`

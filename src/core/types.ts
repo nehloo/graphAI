@@ -1,4 +1,4 @@
-// Bignosis Core Type Definitions
+// Graphnosis Core Type Definitions
 // All TypeScript interfaces that define the dual-graph knowledge model
 
 export type NodeId = string;
