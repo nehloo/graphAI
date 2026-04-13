@@ -1,6 +1,7 @@
-// Bignosis Constants
+// Graphnosis Constants
 
 // .gai file format magic bytes: "GAI" + version 1
+// .gai = "Graphnosis AI" — the AI-native knowledge graph format
 export const GAI_MAGIC = new Uint8Array([0x47, 0x41, 0x49, 0x01]);
 export const GAI_VERSION = 1;
 
