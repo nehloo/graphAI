@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "longmemeval:smoke": "tsx tests/longmemeval/official/run.ts --limit 20",
+    "longmemeval:real": "tsx tests/longmemeval/official/run.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.52",
@@ -40,6 +42,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
     "tailwindcss": "^4",
+    "tsx": "^4.19.2",
     "typescript": "^5"
   }
 }
