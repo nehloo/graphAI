@@ -7,10 +7,15 @@ import { buildSynonymMap, expandQuery } from './synonym-expander';
 
 // Enhanced query engine with synonym expansion and query decomposition
 
+export interface QueryOptions {
+  maxNodes?: number; // Override the default subgraph size cap
+}
+
 export function queryGraph(
   graph: KnowledgeGraph,
   tfidfIndex: TfidfIndex,
-  question: string
+  question: string,
+  opts: QueryOptions = {}
 ): Omit<QueryResult, 'answer'> {
   // Step 1: Decompose complex queries into sub-queries
   const { subQueries } = decomposeQuery(question);
@@ -55,7 +60,7 @@ export function queryGraph(
   }
 
   // Step 4: Traverse graph from merged seeds
-  const traversalResult = traverseGraph(graph, mergedSeeds);
+  const traversalResult = traverseGraph(graph, mergedSeeds, undefined, opts.maxNodes);
 
   // Step 5: Serialize with enrichment data (synthesis + context) if available
   const subgraph = serializeEnrichedSubgraph(
@@ -106,11 +111,25 @@ function serializeEnrichedSubgraph(
   };
 }
 
+export interface PromptContext {
+  // ISO date (YYYY-MM-DD) treated as "today" for the question. When set, the
+  // model can compute elapsed time between the question and node session dates.
+  questionDate?: string;
+}
+
 // Build the system prompt for the LLM with the subgraph context
-export function buildGraphPrompt(subgraphSerialized: string, question: string): string {
+export function buildGraphPrompt(
+  subgraphSerialized: string,
+  question: string,
+  ctx: PromptContext = {}
+): string {
+  const dateBlock = ctx.questionDate
+    ? `Today's date: ${ctx.questionDate}. Nodes may carry a \`date:YYYY-MM-DD\` tag indicating when the originating session occurred — use these to answer temporal questions (e.g., "how many days ago", "last month") and to order events.\n\n`
+    : '';
+
   return `You are a knowledge assistant powered by Graphnosis. You answer questions using ONLY the knowledge graph context provided below. If the context doesn't contain enough information, say so explicitly.
 
-The context is a structured knowledge subgraph with typed nodes and edges:
+${dateBlock}The context is a structured knowledge subgraph with typed nodes and edges:
 - Nodes have types: fact, concept, entity, event, definition, claim, data-point, person
 - Directed edges show relationships: causes, depends-on, precedes, contains, defines, cites, contradicts, supports, supersedes
 - Undirected edges show associations: similar-to, co-occurs, shares-entity, shares-topic, same-source, related-to

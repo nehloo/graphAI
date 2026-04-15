@@ -59,6 +59,7 @@ npx tsx tests/longmemeval/official/run.ts \
 | `--answer-model` | `gpt-4o-mini` | Answering model |
 | `--concurrency` | `4` | Parallel questions in flight |
 | `--seed` | `42` | Sampling seed (deterministic with `--limit`) |
+| `--max-nodes` | `30` | Subgraph node cap passed to the retriever (app default is 20) |
 
 ## Output
 

@@ -10,6 +10,8 @@ import { queryGraph, buildGraphPrompt } from './query-engine';
 export interface AnswerOptions {
   model?: string; // OpenAI model id; defaults to gpt-4o-mini (same as chat route)
   priorMessages?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  questionDate?: string; // ISO date treated as "today" for the prompt
+  maxNodes?: number; // Override subgraph size cap (default: TOP_K_NODES = 20)
 }
 
 export interface AnswerResult {
@@ -25,8 +27,10 @@ export async function answerQuestion(
   question: string,
   opts: AnswerOptions = {}
 ): Promise<AnswerResult> {
-  const { subgraph, seeds } = queryGraph(graph, tfidfIndex, question);
-  const systemPrompt = buildGraphPrompt(subgraph.serialized, question);
+  const { subgraph, seeds } = queryGraph(graph, tfidfIndex, question, { maxNodes: opts.maxNodes });
+  const systemPrompt = buildGraphPrompt(subgraph.serialized, question, {
+    questionDate: opts.questionDate,
+  });
 
   const messages = [
     ...(opts.priorMessages ?? []),

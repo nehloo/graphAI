@@ -28,6 +28,7 @@ interface CliArgs {
   answerModel: string;
   concurrency: number;
   seed: number;
+  maxNodes: number;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -60,6 +61,7 @@ function parseArgs(argv: string[]): CliArgs {
     answerModel: args['answer-model'] ?? 'gpt-4o-mini',
     concurrency: args.concurrency ? parseInt(args.concurrency, 10) : 4,
     seed: args.seed ? parseInt(args.seed, 10) : 42,
+    maxNodes: args['max-nodes'] ? parseInt(args['max-nodes'], 10) : 30,
   };
 }
 
@@ -100,7 +102,8 @@ function loadDone(jsonlPath: string): Set<string> {
 async function runOne(
   q: LMEQuestion,
   answerModel: string,
-  judge: JudgeModel
+  judge: JudgeModel,
+  maxNodes: number
 ): Promise<QuestionResult> {
   const base = {
     question_id: q.question_id,
@@ -117,6 +120,8 @@ async function runOne(
 
     const { answer, nodeCount } = await answerQuestion(graph, graph.tfidfIndex, q.question, {
       model: answerModel,
+      questionDate: q.question_date,
+      maxNodes,
     });
     const t2 = performance.now();
 
@@ -262,7 +267,7 @@ async function main() {
     `[longmemeval] ${all.length} questions selected, ${done.size} already scored, ${todo.length} to run`
   );
   console.log(
-    `[longmemeval] answer=${args.answerModel} judge=${args.judge} concurrency=${args.concurrency}`
+    `[longmemeval] answer=${args.answerModel} judge=${args.judge} concurrency=${args.concurrency} maxNodes=${args.maxNodes}`
   );
 
   const doneResults: QuestionResult[] = [];
@@ -283,7 +288,7 @@ async function main() {
   await runPool(
     todo,
     args.concurrency,
-    async (q) => runOne(q, args.answerModel, args.judge),
+    async (q) => runOne(q, args.answerModel, args.judge, args.maxNodes),
     (r) => {
       completed++;
       appendFileSync(jsonlPath, JSON.stringify(r) + '\n', 'utf-8');

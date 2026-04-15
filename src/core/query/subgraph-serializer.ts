@@ -35,7 +35,12 @@ export function serializeSubgraph(
     const shortId = shortIds.get(node.id)!;
     const score = (scores.get(node.id) || 0).toFixed(2);
     const source = node.source.section ? `src:${node.source.section}` : '';
-    lines.push(`[${shortId}|${node.type}|${score}${source ? '|' + source : ''}] ${node.content}`);
+    // Surface the originating session date when available so the LLM can do
+    // temporal reasoning (e.g., "how many days ago did I mention X").
+    const sessionDate = node.metadata.sessionDate;
+    const date = typeof sessionDate === 'string' && sessionDate ? `date:${sessionDate}` : '';
+    const tags = [source, date].filter(Boolean).join('|');
+    lines.push(`[${shortId}|${node.type}|${score}${tags ? '|' + tags : ''}] ${node.content}`);
   }
 
   // Directed edges

@@ -18,9 +18,12 @@ export function chunkDocument(doc: ParsedDocument): ExtractedChunk[] {
     links: [],
   });
 
-  // Process each section recursively
+  // Process each section recursively. Pass doc.metadata so per-document
+  // context (e.g., sessionDate / sessionId for LongMemEval) propagates to
+  // every child chunk - previously it was lost, which meant temporal
+  // questions had zero date grounding at query time.
   for (const section of doc.sections) {
-    chunkSection(section, chunks, doc.sourceFile, docChunkId, order);
+    chunkSection(section, chunks, doc.sourceFile, docChunkId, order, doc.metadata);
     order = chunks.length;
   }
 
@@ -32,7 +35,8 @@ function chunkSection(
   chunks: ExtractedChunk[],
   sourceFile: string,
   parentId: string,
-  startOrder: number
+  startOrder: number,
+  inheritedMetadata: Record<string, string | number> = {}
 ): void {
   let order = startOrder;
 
@@ -43,7 +47,7 @@ function chunkSection(
     type: 'section',
     source: { file: sourceFile, offset: 0, section: section.title },
     entities: extractEntities(section.title),
-    metadata: { depth: section.depth },
+    metadata: { ...inheritedMetadata, depth: section.depth },
     parentId,
     order: order++,
     links: [],
@@ -64,7 +68,7 @@ function chunkSection(
         type,
         source: { file: sourceFile, offset: 0, section: section.title },
         entities,
-        metadata: { sectionTitle: section.title },
+        metadata: { ...inheritedMetadata, sectionTitle: section.title },
         parentId: sectionId,
         order: order++,
         links,
@@ -74,7 +78,7 @@ function chunkSection(
 
   // Recurse into children
   for (const child of section.children) {
-    chunkSection(child, chunks, sourceFile, sectionId, order);
+    chunkSection(child, chunks, sourceFile, sectionId, order, inheritedMetadata);
     order = chunks.length;
   }
 }
