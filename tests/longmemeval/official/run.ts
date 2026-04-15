@@ -17,7 +17,8 @@ import { performance } from 'node:perf_hooks';
 import { loadDataset, isAbstention, type LMEQuestion, type LMEQuestionType } from './dataset';
 import { buildGraphForQuestion, normalizeDate } from './ingest';
 import { judgeAnswer, type JudgeModel } from './judge';
-import { answerQuestion } from '@/core/query/answer';
+import { answerQuestion, type RetrievalMode } from '@/core/query/answer';
+import { attachEmbeddings } from '@/core/graph/graph-builder';
 
 interface CliArgs {
   dataset: string;
@@ -30,6 +31,8 @@ interface CliArgs {
   seed: number;
   maxNodes: number;
   dumpPrompts: boolean;
+  retrieval: RetrievalMode;
+  embeddingModel: string;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -64,6 +67,8 @@ function parseArgs(argv: string[]): CliArgs {
     seed: args.seed ? parseInt(args.seed, 10) : 42,
     maxNodes: args['max-nodes'] ? parseInt(args['max-nodes'], 10) : 30,
     dumpPrompts: args['dump-prompts'] === 'true',
+    retrieval: ((args.retrieval ?? 'tfidf') as RetrievalMode),
+    embeddingModel: args['embedding-model'] ?? 'text-embedding-3-small',
   };
 }
 
@@ -105,7 +110,9 @@ async function runOne(
   q: LMEQuestion,
   answerModel: string,
   judge: JudgeModel,
-  maxNodes: number
+  maxNodes: number,
+  retrieval: RetrievalMode,
+  embeddingModel: string
 ): Promise<{ result: QuestionResult; systemPrompt?: string }> {
   const base = {
     question_id: q.question_id,
@@ -117,14 +124,24 @@ async function runOne(
 
   try {
     const t0 = performance.now();
-    const graph = buildGraphForQuestion(q);
+    let graph = buildGraphForQuestion(q);
+    if (retrieval !== 'tfidf') {
+      graph = await attachEmbeddings(graph, { model: embeddingModel });
+    }
     const t1 = performance.now();
 
     const { answer, nodeCount, systemPrompt } = await answerQuestion(
       graph,
       graph.tfidfIndex,
       q.question,
-      { model: answerModel, questionDate: normalizeDate(q.question_date), maxNodes }
+      {
+        model: answerModel,
+        questionDate: normalizeDate(q.question_date),
+        maxNodes,
+        retrieval,
+        embeddingIndex: graph.embeddingIndex,
+        embeddingModel,
+      }
     );
     const t2 = performance.now();
 
@@ -276,7 +293,7 @@ async function main() {
     `[longmemeval] ${all.length} questions selected, ${done.size} already scored, ${todo.length} to run`
   );
   console.log(
-    `[longmemeval] answer=${args.answerModel} judge=${args.judge} concurrency=${args.concurrency} maxNodes=${args.maxNodes}${args.dumpPrompts ? ' dumpPrompts' : ''}`
+    `[longmemeval] retrieval=${args.retrieval}${args.retrieval !== 'tfidf' ? ` (${args.embeddingModel})` : ''} answer=${args.answerModel} judge=${args.judge} concurrency=${args.concurrency} maxNodes=${args.maxNodes}${args.dumpPrompts ? ' dumpPrompts' : ''}`
   );
   if (args.dumpPrompts) console.log(`[longmemeval] writing prompts to ${promptsPath}`);
 
@@ -298,7 +315,7 @@ async function main() {
   await runPool(
     todo,
     args.concurrency,
-    async (q) => runOne(q, args.answerModel, args.judge, args.maxNodes),
+    async (q) => runOne(q, args.answerModel, args.judge, args.maxNodes, args.retrieval, args.embeddingModel),
     ({ result: r, systemPrompt }) => {
       completed++;
       appendFileSync(jsonlPath, JSON.stringify(r) + '\n', 'utf-8');

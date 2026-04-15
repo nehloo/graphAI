@@ -4,9 +4,9 @@
 // into a ParsedDocument (reusing conversationToDocument) and build a fresh,
 // isolated KnowledgeGraph so there's no cross-question contamination.
 
-import type { ParsedDocument, ParsedConversation, KnowledgeGraph, TfidfIndex } from '@/core/types';
+import type { ParsedDocument, ParsedConversation } from '@/core/types';
 import { conversationToDocument } from '@/core/ingestion/parsers/conversation-parser';
-import { buildGraph } from '@/core/graph/graph-builder';
+import { buildGraph, type BuiltGraph } from '@/core/graph/graph-builder';
 import type { LMEQuestion, LMESession } from './dataset';
 
 // LongMemEval uses dates like "2023/03/31 (Fri) 14:13". The day-of-week is
@@ -68,12 +68,12 @@ function sessionToDocument(
   return doc;
 }
 
-export function buildGraphForQuestion(q: LMEQuestion): KnowledgeGraph & { tfidfIndex: TfidfIndex } {
+export function buildGraphForQuestion(q: LMEQuestion): BuiltGraph {
   const docs: ParsedDocument[] = [];
   for (let i = 0; i < q.haystack_sessions.length; i++) {
     const sessionId = q.haystack_session_ids[i] ?? `session_${i}`;
     const sessionDate = q.haystack_dates[i] ?? q.question_date;
     docs.push(sessionToDocument(q.question_id, sessionId, sessionDate, q.haystack_sessions[i]));
   }
-  return buildGraph(docs, `lme:${q.question_id}`) as KnowledgeGraph & { tfidfIndex: TfidfIndex };
+  return buildGraph(docs, `lme:${q.question_id}`);
 }

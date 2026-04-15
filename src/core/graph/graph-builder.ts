@@ -8,11 +8,17 @@ import type {
 } from '@/core/types';
 import { chunkDocument } from '@/core/extraction/chunker';
 import { createTfidfIndex, addDocument, computeIdf } from '@/core/similarity/tfidf';
+import { createEmbeddingIndex, embedNodes, type EmbeddingIndex } from '@/core/similarity/embeddings';
 import { buildDirectedEdges, chunkKey } from './directed-edges';
 import { buildUndirectedEdges } from './undirected-edges';
 import { pruneGraph } from '@/core/optimization/pruner';
 
-export function buildGraph(documents: ParsedDocument[], graphName: string): KnowledgeGraph {
+export type BuiltGraph = KnowledgeGraph & {
+  tfidfIndex: ReturnType<typeof createTfidfIndex>;
+  embeddingIndex?: EmbeddingIndex;
+};
+
+export function buildGraph(documents: ParsedDocument[], graphName: string): BuiltGraph {
   // Step 1: Chunk all documents
   const allChunks: ExtractedChunk[] = [];
   for (const doc of documents) {
@@ -113,7 +119,31 @@ export function buildGraph(documents: ParsedDocument[], graphName: string): Know
     console.log(`[graphnosis] Pruned ${prunedNodes} orphan nodes, ${prunedEdges} low-weight edges`);
   }
 
-  return { ...graph, tfidfIndex } as KnowledgeGraph & { tfidfIndex: typeof tfidfIndex };
+  return { ...graph, tfidfIndex } as BuiltGraph;
+}
+
+// Async pass: embed every content chunk and attach an EmbeddingIndex.
+// Kept separate from buildGraph so the sync ingestion path stays sync for
+// every existing caller (Chat / Giki / examples / app routes). Only the
+// LongMemEval runner opts into this for now.
+export async function attachEmbeddings(
+  graph: BuiltGraph,
+  opts: { model?: string } = {}
+): Promise<BuiltGraph> {
+  const items: Array<{ nodeId: NodeId; text: string }> = [];
+  for (const node of graph.nodes.values()) {
+    // Skip structural nodes; they're filtered from the serialized prompt anyway
+    // and embedding them would waste budget.
+    if (node.type === 'document' || node.type === 'section') continue;
+    if (!node.content || !node.content.trim()) continue;
+    items.push({ nodeId: node.id, text: node.content });
+  }
+  if (items.length === 0) return graph;
+
+  const index = createEmbeddingIndex(opts.model);
+  await embedNodes(index, items, { model: opts.model });
+  graph.embeddingIndex = index;
+  return graph;
 }
 
 function simpleHash(text: string): string {

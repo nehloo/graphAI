@@ -8,11 +8,12 @@ import type {
   UndirectedEdge,
   NodeId,
 } from '@/core/types';
-import { findSeeds, type ScoredSeed } from './seed-finder';
+import { findSeeds, findSeedsByEmbedding, type ScoredSeed } from './seed-finder';
 import { traverseGraph } from './traverser';
 import { serializeSubgraph } from './subgraph-serializer';
 import { decomposeQuery } from './query-decomposer';
 import { buildSynonymMap, expandQuery } from './synonym-expander';
+import type { EmbeddingIndex, EmbeddingVector } from '@/core/similarity/embeddings';
 
 // Enhanced query engine with synonym expansion and query decomposition
 
@@ -20,6 +21,15 @@ export interface QueryOptions {
   maxNodes?: number; // Override the default subgraph size cap
   maxSeeds?: number; // Cap on merged seeds after sub-query expansion (default 24)
   diversify?: boolean; // Round-robin seeds across source files to cover multi-session questions (default true)
+  // Semantic-retrieval mode. When both are provided, embedding seeds are
+  // merged into the seed pool alongside TF-IDF seeds. This lets us match
+  // "previous job" against a session that says "Acme Corp" without sharing
+  // any literal terms.
+  embeddingIndex?: EmbeddingIndex;
+  queryEmbedding?: EmbeddingVector;
+  // When true, skip the TF-IDF seed pool entirely and use only embedding
+  // seeds. Has no effect unless embeddingIndex + queryEmbedding are set.
+  embeddingsOnly?: boolean;
 }
 
 export function queryGraph(
@@ -45,11 +55,33 @@ export function queryGraph(
   // Deduplicate
   const uniqueQueries = [...new Set(allQueries)];
 
-  // Step 3: Find seeds across all query variants and merge
+  const useEmbeddings = !!(opts.embeddingIndex && opts.queryEmbedding);
+  const skipTfidf = useEmbeddings && opts.embeddingsOnly === true;
+
+  // Step 3: Find seeds across all query variants and merge (TF-IDF pool)
   const seedMap = new Map<string, ScoredSeed>();
-  for (const q of uniqueQueries) {
-    const seeds = findSeeds(q, tfidfIndex);
-    for (const seed of seeds) {
+  if (!skipTfidf) {
+    for (const q of uniqueQueries) {
+      const seeds = findSeeds(q, tfidfIndex);
+      for (const seed of seeds) {
+        const existing = seedMap.get(seed.nodeId);
+        if (!existing || seed.score > existing.score) {
+          seedMap.set(seed.nodeId, seed);
+        }
+      }
+    }
+  }
+
+  // Step 3b: Embedding-based seed pool. In hybrid mode (the default when an
+  // embedding index is provided) these are merged with TF-IDF seeds; in
+  // embeddings-only mode they are the entire pool. The query was pre-embedded
+  // by the caller (one API call) so this stage is pure linear-algebra over
+  // the in-memory EmbeddingIndex. Use a generous bonus cap so semantic
+  // matches have room to compete; diversification + BFS budget trim the pool.
+  if (useEmbeddings) {
+    const embedCap = skipTfidf ? maxSeeds * 2 : 16;
+    const embedSeeds = findSeedsByEmbedding(opts.queryEmbedding!, opts.embeddingIndex!, embedCap);
+    for (const seed of embedSeeds) {
       const existing = seedMap.get(seed.nodeId);
       if (!existing || seed.score > existing.score) {
         seedMap.set(seed.nodeId, seed);

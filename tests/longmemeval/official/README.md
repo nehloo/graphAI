@@ -24,16 +24,32 @@ Unlike `tests/longmemeval/longmemeval.test.ts` (12 custom questions with keyword
    export OPENAI_API_KEY=sk-...
    ```
 
+## Retrieval modes
+
+Pick one with `--retrieval` (or use the convenience npm scripts below):
+
+| Mode | Behavior | API cost beyond answer+judge |
+| --- | --- | --- |
+| `tfidf` (default) | Lexical TF-IDF only — no embedding API calls | $0 |
+| `embeddings` | Semantic only — embeds the haystack and the query, ranks by cosine | ~$0.001 per question (text-embedding-3-small) |
+| `hybrid` | Both pools merged: TF-IDF seeds + embedding seeds, then diversified | ~$0.001 per question |
+
+Embedding model is configurable via `--embedding-model` (default `text-embedding-3-small`; `text-embedding-3-large` is ~6x more expensive but slightly stronger).
+
 ## Running
 
-Smoke test (20 questions, ~5 min, ~$1):
+Smoke (20 questions, ~5 min):
 ```bash
-npm run longmemeval:smoke
+npm run longmemeval:smoke              # tfidf, the default
+npm run longmemeval:smoke:embeddings   # embeddings only
+npm run longmemeval:smoke:hybrid       # tfidf + embeddings merged
 ```
 
-Full benchmark (500 questions, ~1–2 hours, tens of dollars):
+Full 500 (~1–2 hours; embedding modes add ~$0.50 in API cost):
 ```bash
 npm run longmemeval:real
+npm run longmemeval:real:embeddings
+npm run longmemeval:real:hybrid
 ```
 
 Custom flags:
@@ -41,6 +57,8 @@ Custom flags:
 npx tsx tests/longmemeval/official/run.ts \
   --dataset data/longmemeval/longmemeval_s.json \
   --out data/longmemeval/results \
+  --retrieval hybrid \
+  --embedding-model text-embedding-3-small \
   --limit 50 \
   --types temporal-reasoning,multi-session \
   --judge gpt-4o \
@@ -57,6 +75,8 @@ npx tsx tests/longmemeval/official/run.ts \
 | `--types a,b` | (all) | Restrict to question types |
 | `--judge` | `gpt-4o` | Judge model (`gpt-4o` or `gpt-4o-mini`) |
 | `--answer-model` | `gpt-4o-mini` | Answering model |
+| `--retrieval` | `tfidf` | `tfidf` \| `embeddings` \| `hybrid` |
+| `--embedding-model` | `text-embedding-3-small` | OpenAI embedding model |
 | `--concurrency` | `4` | Parallel questions in flight |
 | `--seed` | `42` | Sampling seed (deterministic with `--limit`) |
 | `--max-nodes` | `30` | Subgraph node cap passed to the retriever (app default is 20) |

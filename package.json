@@ -8,7 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "longmemeval:smoke": "tsx tests/longmemeval/official/run.ts --limit 20",
-    "longmemeval:real": "tsx tests/longmemeval/official/run.ts"
+    "longmemeval:smoke:embeddings": "tsx tests/longmemeval/official/run.ts --limit 20 --retrieval embeddings",
+    "longmemeval:smoke:hybrid": "tsx tests/longmemeval/official/run.ts --limit 20 --retrieval hybrid",
+    "longmemeval:real": "tsx tests/longmemeval/official/run.ts",
+    "longmemeval:real:embeddings": "tsx tests/longmemeval/official/run.ts --retrieval embeddings",
+    "longmemeval:real:hybrid": "tsx tests/longmemeval/official/run.ts --retrieval hybrid"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.52",
