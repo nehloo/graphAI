@@ -43,13 +43,15 @@ Smoke (20 questions, ~5 min):
 npm run longmemeval:smoke              # tfidf, the default
 npm run longmemeval:smoke:embeddings   # embeddings only
 npm run longmemeval:smoke:hybrid       # tfidf + embeddings merged
+npm run longmemeval:smoke:premium      # hybrid + gpt-4o answer model
 ```
 
-Full 500 (~1–2 hours; embedding modes add ~$0.50 in API cost):
+Full 500 (~1–2 hours for tfidf, ~2 hours for embedding modes):
 ```bash
-npm run longmemeval:real
-npm run longmemeval:real:embeddings
-npm run longmemeval:real:hybrid
+npm run longmemeval:real               # tfidf       ~$15-25
+npm run longmemeval:real:embeddings    # embeddings  ~$25-30
+npm run longmemeval:real:hybrid        # hybrid      ~$25-30
+npm run longmemeval:real:premium       # hybrid + gpt-4o answer  ~$60-90
 ```
 
 Custom flags:
