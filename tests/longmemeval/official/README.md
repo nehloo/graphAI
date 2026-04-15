@@ -77,7 +77,7 @@ npx tsx tests/longmemeval/official/run.ts \
 | `--answer-model` | `gpt-4o-mini` | Answering model |
 | `--retrieval` | `tfidf` | `tfidf` \| `embeddings` \| `hybrid` |
 | `--embedding-model` | `text-embedding-3-small` | OpenAI embedding model |
-| `--concurrency` | `4` (tfidf) / `2` (embeddings, hybrid) | Parallel questions in flight. Embedding modes default lower to stay under OpenAI's 1M TPM window. |
+| `--concurrency` | `4` (tfidf) / `1` (embeddings, hybrid) | Parallel questions in flight. Embedding modes default to serial to stay under OpenAI's 1M TPM window on sustained runs. |
 | `--seed` | `42` | Sampling seed (deterministic with `--limit`) |
 | `--max-nodes` | `30` | Subgraph node cap passed to the retriever (app default is 20) |
 | `--dump-prompts` | `false` | Also write `prompts.jsonl` with the full system prompt per question (debugging) |

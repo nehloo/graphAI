@@ -64,11 +64,12 @@ function parseArgs(argv: string[]): CliArgs {
     judge: (args.judge as JudgeModel) ?? 'gpt-4o',
     answerModel: args['answer-model'] ?? 'gpt-4o-mini',
     // Embedding modes burst against the OpenAI TPM window (~1M/min on
-    // text-embedding-3-small). Default to lower concurrency unless the
-    // caller overrides explicitly.
+    // text-embedding-3-small). The full 500-question run embeds ~75M
+    // tokens total - above 1M/min sustained is impossible, so run
+    // serially. TF-IDF has no such limit and stays at 4.
     concurrency: args.concurrency
       ? parseInt(args.concurrency, 10)
-      : (args.retrieval && args.retrieval !== 'tfidf' ? 2 : 4),
+      : (args.retrieval && args.retrieval !== 'tfidf' ? 1 : 4),
     seed: args.seed ? parseInt(args.seed, 10) : 42,
     maxNodes: args['max-nodes'] ? parseInt(args['max-nodes'], 10) : 30,
     dumpPrompts: args['dump-prompts'] === 'true',
