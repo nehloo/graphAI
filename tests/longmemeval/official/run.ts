@@ -29,6 +29,7 @@ interface CliArgs {
   concurrency: number;
   seed: number;
   maxNodes: number;
+  dumpPrompts: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -62,6 +63,7 @@ function parseArgs(argv: string[]): CliArgs {
     concurrency: args.concurrency ? parseInt(args.concurrency, 10) : 4,
     seed: args.seed ? parseInt(args.seed, 10) : 42,
     maxNodes: args['max-nodes'] ? parseInt(args['max-nodes'], 10) : 30,
+    dumpPrompts: args['dump-prompts'] === 'true',
   };
 }
 
@@ -104,7 +106,7 @@ async function runOne(
   answerModel: string,
   judge: JudgeModel,
   maxNodes: number
-): Promise<QuestionResult> {
+): Promise<{ result: QuestionResult; systemPrompt?: string }> {
   const base = {
     question_id: q.question_id,
     question_type: q.question_type,
@@ -118,41 +120,47 @@ async function runOne(
     const graph = buildGraphForQuestion(q);
     const t1 = performance.now();
 
-    const { answer, nodeCount } = await answerQuestion(graph, graph.tfidfIndex, q.question, {
-      model: answerModel,
-      questionDate: q.question_date,
-      maxNodes,
-    });
+    const { answer, nodeCount, systemPrompt } = await answerQuestion(
+      graph,
+      graph.tfidfIndex,
+      q.question,
+      { model: answerModel, questionDate: q.question_date, maxNodes }
+    );
     const t2 = performance.now();
 
     const verdict = await judgeAnswer(q, answer, { model: judge });
     const t3 = performance.now();
 
     return {
-      ...base,
-      predicted: answer,
-      correct: verdict.correct,
-      judgeRaw: verdict.raw,
-      judgeModel: verdict.judgeModel,
-      answerModel,
-      nodeCount,
-      ingestMs: Math.round(t1 - t0),
-      answerMs: Math.round(t2 - t1),
-      judgeMs: Math.round(t3 - t2),
+      result: {
+        ...base,
+        predicted: answer,
+        correct: verdict.correct,
+        judgeRaw: verdict.raw,
+        judgeModel: verdict.judgeModel,
+        answerModel,
+        nodeCount,
+        ingestMs: Math.round(t1 - t0),
+        answerMs: Math.round(t2 - t1),
+        judgeMs: Math.round(t3 - t2),
+      },
+      systemPrompt,
     };
   } catch (err) {
     return {
-      ...base,
-      predicted: '',
-      correct: false,
-      judgeRaw: '',
-      judgeModel: '',
-      answerModel,
-      nodeCount: 0,
-      ingestMs: 0,
-      answerMs: 0,
-      judgeMs: 0,
-      error: (err as Error).message,
+      result: {
+        ...base,
+        predicted: '',
+        correct: false,
+        judgeRaw: '',
+        judgeModel: '',
+        answerModel,
+        nodeCount: 0,
+        ingestMs: 0,
+        answerMs: 0,
+        judgeMs: 0,
+        error: (err as Error).message,
+      },
     };
   }
 }
@@ -250,6 +258,7 @@ async function main() {
   const jsonlPath = resolve(outDir, 'results.jsonl');
   const jsonPath = resolve(outDir, 'results.json');
   const mdPath = resolve(outDir, 'results.md');
+  const promptsPath = resolve(outDir, 'prompts.jsonl');
 
   mkdirSync(dirname(jsonlPath), { recursive: true });
 
@@ -267,8 +276,9 @@ async function main() {
     `[longmemeval] ${all.length} questions selected, ${done.size} already scored, ${todo.length} to run`
   );
   console.log(
-    `[longmemeval] answer=${args.answerModel} judge=${args.judge} concurrency=${args.concurrency} maxNodes=${args.maxNodes}`
+    `[longmemeval] answer=${args.answerModel} judge=${args.judge} concurrency=${args.concurrency} maxNodes=${args.maxNodes}${args.dumpPrompts ? ' dumpPrompts' : ''}`
   );
+  if (args.dumpPrompts) console.log(`[longmemeval] writing prompts to ${promptsPath}`);
 
   const doneResults: QuestionResult[] = [];
   if (existsSync(jsonlPath)) {
@@ -289,9 +299,23 @@ async function main() {
     todo,
     args.concurrency,
     async (q) => runOne(q, args.answerModel, args.judge, args.maxNodes),
-    (r) => {
+    ({ result: r, systemPrompt }) => {
       completed++;
       appendFileSync(jsonlPath, JSON.stringify(r) + '\n', 'utf-8');
+      if (args.dumpPrompts && systemPrompt !== undefined) {
+        appendFileSync(
+          promptsPath,
+          JSON.stringify({
+            question_id: r.question_id,
+            question_type: r.question_type,
+            correct: r.correct,
+            predicted: r.predicted,
+            gold: r.gold,
+            systemPrompt,
+          }) + '\n',
+          'utf-8'
+        );
+      }
       doneResults.push(r);
       const pct = ((completed / todo.length) * 100).toFixed(1);
       const mark = r.correct ? '+' : r.error ? '!' : '-';

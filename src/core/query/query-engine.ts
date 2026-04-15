@@ -9,6 +9,8 @@ import { buildSynonymMap, expandQuery } from './synonym-expander';
 
 export interface QueryOptions {
   maxNodes?: number; // Override the default subgraph size cap
+  maxSeeds?: number; // Cap on merged seeds after sub-query expansion (default 24)
+  diversify?: boolean; // Round-robin seeds across source files to cover multi-session questions (default true)
 }
 
 export function queryGraph(
@@ -17,6 +19,9 @@ export function queryGraph(
   question: string,
   opts: QueryOptions = {}
 ): Omit<QueryResult, 'answer'> {
+  const maxSeeds = opts.maxSeeds ?? 24;
+  const diversify = opts.diversify ?? true;
+
   // Step 1: Decompose complex queries into sub-queries
   const { subQueries } = decomposeQuery(question);
 
@@ -43,9 +48,15 @@ export function queryGraph(
     }
   }
 
-  const mergedSeeds = Array.from(seedMap.values())
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 8); // Slightly more seeds than default for better coverage
+  // Merge into a final seed list. Multi-part / multi-session questions
+  // benefit from seeds spread across different source files; otherwise
+  // TF-IDF tends to cluster the top-N in one dominant session and BFS
+  // never reaches the other evidence. Round-robin by source file when
+  // diversify is on, falling back to pure-score order.
+  const sortedSeeds = Array.from(seedMap.values()).sort((a, b) => b.score - a.score);
+  const mergedSeeds = diversify
+    ? diversifySeedsBySource(sortedSeeds, graph, maxSeeds)
+    : sortedSeeds.slice(0, maxSeeds);
 
   if (mergedSeeds.length === 0) {
     return {
@@ -74,6 +85,44 @@ export function queryGraph(
     subgraph,
     seeds: mergedSeeds.map(s => ({ nodeId: s.nodeId, score: s.score })),
   };
+}
+
+// Group seeds by source file, then interleave: take the best seed from each
+// source, then the second-best from each, etc., until the cap is hit. This
+// prevents a single session from hogging the seed budget when the question
+// requires evidence from multiple sessions.
+function diversifySeedsBySource(
+  seeds: ScoredSeed[],
+  graph: KnowledgeGraph,
+  cap: number
+): ScoredSeed[] {
+  if (seeds.length <= cap) return seeds;
+
+  const bySource = new Map<string, ScoredSeed[]>();
+  for (const seed of seeds) {
+    const node = graph.nodes.get(seed.nodeId);
+    const key = node ? node.source.file : '__unknown__';
+    const bucket = bySource.get(key);
+    if (bucket) bucket.push(seed);
+    else bySource.set(key, [seed]);
+  }
+
+  const buckets = Array.from(bySource.values()); // Each already ordered by score
+  const picked: ScoredSeed[] = [];
+  let round = 0;
+  while (picked.length < cap) {
+    let addedThisRound = false;
+    for (const bucket of buckets) {
+      if (round < bucket.length) {
+        picked.push(bucket[round]);
+        addedThisRound = true;
+        if (picked.length >= cap) break;
+      }
+    }
+    if (!addedThisRound) break;
+    round++;
+  }
+  return picked;
 }
 
 // Enhanced serializer that includes synthesis and context from enrichment

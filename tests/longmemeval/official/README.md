@@ -60,6 +60,7 @@ npx tsx tests/longmemeval/official/run.ts \
 | `--concurrency` | `4` | Parallel questions in flight |
 | `--seed` | `42` | Sampling seed (deterministic with `--limit`) |
 | `--max-nodes` | `30` | Subgraph node cap passed to the retriever (app default is 20) |
+| `--dump-prompts` | `false` | Also write `prompts.jsonl` with the full system prompt per question (debugging) |
 
 ## Output
 

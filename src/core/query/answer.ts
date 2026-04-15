@@ -19,6 +19,7 @@ export interface AnswerResult {
   subgraph: SubgraphContext;
   seeds: Array<{ nodeId: NodeId; score: number }>;
   nodeCount: number;
+  systemPrompt: string;
 }
 
 export async function answerQuestion(
@@ -48,5 +49,6 @@ export async function answerQuestion(
     subgraph,
     seeds,
     nodeCount: subgraph.nodes.length,
+    systemPrompt,
   };
 }
