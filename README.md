@@ -337,10 +337,6 @@ Explore the working prototype: **[graphnosis.vercel.app](https://graphnosis.verc
 ## Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/longmemeval-2.png" alt="LongMemEval — Knowledge retention benchmark — 12 tests across 4 categories" width="100%" />
-</p>
-
-<p align="center">
   <img src="docs/screenshots/examples-2.png" alt="Example Datasets — load public datasets into Graphnosis" width="100%" />
 </p>
 
