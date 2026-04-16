@@ -1,7 +1,6 @@
 # Graphnosis — Dual-Graph Knowledge System
 
 [![Website](https://img.shields.io/badge/website-graphnosis.vercel.app-blue?style=flat&logo=vercel)](https://graphnosis.vercel.app)
-[![Version](https://img.shields.io/github/v/release/nehloo/Graphnosis?include_prereleases&style=flat)](https://github.com/nehloo/Graphnosis/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat)](https://github.com/nehloo/Graphnosis/blob/main/LICENSE)
 
@@ -189,7 +188,7 @@ Graphnosis exists alongside other approaches to persistent AI knowledge. Each ma
 
 **Where Graphnosis wins:** Relationship-aware reasoning, multi-source knowledge fusion, token efficiency, automated contradiction detection.
 
-**Where others win:** GBrain has native git version control. MemPalace has battle-tested conversation recall (96.6% LongMemEval). Karpathy's pattern produces richer narrative synthesis.
+**Where others win:** GBrain has native git version control. MemPalace achieves 96.6% retrieval recall R@5 on LongMemEval (different metric than end-to-end QA — see [benchmarks.md](benchmarks.md)). Karpathy's pattern produces richer narrative synthesis.
 
 **They complement each other:** MemPalace for conversation memory, GBrain for personal knowledge management, Graphnosis for structured domain knowledge with explicit relationships.
 
@@ -219,12 +218,52 @@ All datasets use freely-licensed public content:
 
 ## Performance
 
+### Graph Engine
+
 Benchmarked on the Wikipedia dataset (12,199 nodes, 67,578 edges):
 
 - **Avg query time:** 75ms (seed finding + graph traversal + serialization)
 - **Avg nodes retrieved:** 20 per query
 - **Avg token estimate:** ~2,138 tokens per subgraph context
 - **Graph construction:** ~15 seconds for 51 Wikipedia articles
+
+### LongMemEval — Official Benchmark
+
+**72.20%** end-to-end QA accuracy on the [official LongMemEval benchmark](https://github.com/xiaowu0162/LongMemEval) (500 questions, gpt-4o answer + gpt-4o judge, hybrid retrieval).
+
+| Category | Score |
+|---|---|
+| single-session-user | 95.31% (61/64) |
+| knowledge-update | 83.33% (60/72) |
+| single-session-assistant | 82.14% (46/56) |
+| temporal-reasoning | 70.08% (89/127) |
+| multi-session | 58.68% (71/121) |
+| single-session-preference | 26.67% (8/30) |
+
+**What got us here:**
+- Hybrid retrieval: TF-IDF graph traversal + semantic embeddings (text-embedding-3-small)
+- Temporal grounding: date normalization, wider BFS subgraph for time-sensitive questions
+- Session-diverse seed selection to improve cross-session recall
+- Sibling-turn expansion to include conversational context around relevant turns
+- Preference prompting + semantic reranking for ambiguous queries
+- Aggregation-aware retrieval + prompt for multi-session questions (sum vs. supersede logic)
+- Upgraded answer model from gpt-4o-mini to gpt-4o
+
+**Leaderboard context** (end-to-end QA with official GPT-4 judge):
+
+| System | Score |
+|---|---|
+| Agentmemory V4 | 96.20% |
+| PwC Chronos | 95.60% |
+| OMEGA | 95.40% |
+| Mastra | 94.87% |
+| Supermemory | 85.86% |
+| **Graphnosis** | **72.20%** |
+| Zep | 71.20% |
+
+> MemPalace's 96.6%/100% figures measure **retrieval recall R@5** (is the correct conversation session in the top 5 results?) — a different metric than end-to-end QA with a GPT-4 judge. Both are valid; they measure different things. This runner uses the verbatim official judge prompts from [xiaowu0162/LongMemEval](https://github.com/xiaowu0162/LongMemEval).
+
+For the full benchmark progression story — every iteration from first run to this result — see [benchmarks.md](benchmarks.md).
 
 ## Getting Started
 
