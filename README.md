@@ -1,5 +1,10 @@
 # Graphnosis — Dual-Graph Knowledge System
 
+[![Website](https://img.shields.io/badge/website-graphnosis.vercel.app-blue?style=flat&logo=vercel)](https://graphnosis.vercel.app)
+[![Version](https://img.shields.io/github/v/release/nehloo/Graphnosis?include_prereleases&style=flat)](https://github.com/nehloo/Graphnosis/releases)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat)](https://github.com/nehloo/Graphnosis/blob/main/LICENSE)
+
 **Can AI understand files better than humans can read them?**
 
 Graphnosis transforms raw files into AI-optimized directed and undirected graph representations. Instead of feeding AI models flat text chunks (the standard RAG approach), Graphnosis builds a structured knowledge graph with typed relationships — then serializes relevant subgraphs into a format designed for machine comprehension, not human readability.
