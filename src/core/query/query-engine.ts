@@ -38,7 +38,13 @@ export function queryGraph(
   question: string,
   opts: QueryOptions = {}
 ): Omit<QueryResult, 'answer'> {
-  const maxSeeds = opts.maxSeeds ?? 24;
+  // Aggregation questions (count / sum / total) need more evidence than
+  // standard questions - their failure mode is missing ONE session among
+  // several. Widen both the seed pool and the node budget when detected,
+  // unless the caller has explicitly overridden.
+  const isAggregation = isAggregationQuestion(question);
+  const maxSeeds = opts.maxSeeds ?? (isAggregation ? 40 : 24);
+  const maxNodes = opts.maxNodes ?? (isAggregation ? 50 : undefined);
   const diversify = opts.diversify ?? true;
 
   // Step 1: Decompose complex queries into sub-queries
@@ -112,7 +118,7 @@ export function queryGraph(
   }
 
   // Step 4: Traverse graph from merged seeds
-  const traversalResult = traverseGraph(graph, mergedSeeds, undefined, opts.maxNodes);
+  const traversalResult = traverseGraph(graph, mergedSeeds, undefined, maxNodes);
 
   // Step 4b: Sibling-turn expansion. For each retrieved Assistant chunk,
   // also include the User chunk(s) from the same turn pair. User questions
@@ -356,6 +362,19 @@ function isPreferenceQuestion(question: string): boolean {
   return PREFERENCE_INTENT.test(question);
 }
 
+// Heuristic: aggregation question (count / sum / total). Failure mode for
+// these is retrieval-completeness - we surface most relevant sessions but
+// miss one, so the aggregate comes out low. When detected we widen both
+// the seed pool and the final subgraph budget, and add a prompt block that
+// tells the model to enumerate-then-compute and to verify each instance
+// matches the question's criterion (e.g. "cuisine" excludes "vegan diet").
+const AGGREGATION_INTENT =
+  /\b(total|how many|how much|number of|count of|sum of|all of the|every time)\b/i;
+
+export function isAggregationQuestion(question: string): boolean {
+  return AGGREGATION_INTENT.test(question);
+}
+
 // Build the system prompt for the LLM with the subgraph context
 export function buildGraphPrompt(
   subgraphSerialized: string,
@@ -380,11 +399,22 @@ When the question references a specific day or relative time (e.g., "last Friday
 `
     : '';
 
+  const aggregationBlock = isAggregationQuestion(question)
+    ? `This question asks for a total, count, or aggregate across multiple sessions. Procedure:
+1. Scan the context and list each instance that matches the question's criterion (e.g., "cuisine" = a national/regional cooking tradition, NOT a diet like "vegan"; "purchase" = an actual buy event, NOT a wish).
+2. For each candidate, verify it actually matches — reject loose matches.
+3. Then compute the aggregate (sum amounts / count instances).
+4. State the answer first, then briefly list the instances you counted.
+If you found fewer instances than expected, don't inflate the count — report only what's in the context.
+
+`
+    : '';
+
   return `You are a knowledge assistant powered by Graphnosis. You answer questions using ONLY the knowledge graph context provided below. If the context doesn't contain enough information, say so explicitly.
 
 Answer concisely. Lead with the direct answer in the first sentence, then cite supporting detail only if useful. Avoid padding or unrelated context — extra information that conflicts with the answer counts against you.
 
-${dateBlock}${preferenceBlock}The context is a structured knowledge subgraph with typed nodes and edges:
+${dateBlock}${preferenceBlock}${aggregationBlock}The context is a structured knowledge subgraph with typed nodes and edges:
 - Nodes have types: fact, concept, entity, event, definition, claim, data-point, person
 - Directed edges show relationships: causes, depends-on, precedes, contains, defines, cites, contradicts, supports, supersedes
 - Undirected edges show associations: similar-to, co-occurs, shares-entity, shares-topic, same-source, related-to
