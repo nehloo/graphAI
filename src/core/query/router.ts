@@ -79,13 +79,26 @@ const PREFERENCE_INTENT =
 const KNOWLEDGE_UPDATE_INTENT =
   /\b(currently|these days|most recent\b|latest|still (have|work|live|own|use|play|attend|go|take|run|write)|no longer|any\s*more|updated|recently (moved|changed|started|switched|bought|got)|recent (move|relocation|change|update|switch|job|role|position|trip|visit)|new (job|address|home|apartment|name|role|car|gym|workplace|hobby)|moved to|switched to|used to (be|have|live|work|go|own|attend)|since I (started|began|moved|switched|changed|got|joined)|(my|our) (current|latest|new|newest) |personal best|now (have|own|use|play|work|live|run)|after (his|her|their|my) (recent|relocation|move|change)|how long have I\b|how often do I\b|how often does\b|\bso far\b|before I (purchased|bought|got|started|switched|moved|changed)|before getting\b|more frequently than|(previous|current) (status|version|role|job|gym|address|tutor|coach|doctor|therapist))\b/i;
 
+// Strong aggregation signal — runs BEFORE temporal and knowledge-update so
+// "how many events in the past month" and "how many items do I currently own"
+// are not stolen by the temporal 'past month' anchor or the KU 'currently'
+// pattern. Negative lookahead excludes pure time-elapsed questions like
+// "how many days ago", "how many months have passed", "how many hours has it
+// been" — where the time unit itself is what's being measured.
+const STRONG_AGGREGATION_INTENT =
+  /\b(how many (?!(?:days?|weeks?|months?|years?|hours?) (?:ago|since|between|later|passed|elapsed|have (?:passed|elapsed|been)|has (?:passed|elapsed|been)|it\s+been)\b)|how much (?!(?:longer|more time|time)\b)|average (?:age|score|price|cost|rating|number)\b|in total\b|grand total\b|across (?:all|multiple)\b|combined\b|altogether\b)\b/i;
+
 // Aggregation / multi-session: count / sum / total / every-time. Final
-// fallback for "how many X" that isn't temporal or knowledge-update.
+// fallback for signals not caught by STRONG_AGGREGATION (e.g. "total",
+// "sum of", "count of", "every time" without a leading "how many").
 const AGGREGATION_INTENT =
   /\b(total|how many|how much|number of|count of|sum of|all of the|every time|each time|across (all|multiple)|combined|altogether|in total)\b/i;
 
 export function classifyQuestion(question: string): LMEQuestionType {
   if (ASSISTANT_INTENT.test(question)) return 'single-session-assistant';
+  // STRONG_AGGREGATION before temporal/KU: "how many X in the past month" and
+  // "how many X do I currently own" are count questions, not temporal or KU.
+  if (STRONG_AGGREGATION_INTENT.test(question)) return 'multi-session';
   if (TEMPORAL_INTENT.test(question)) return 'temporal-reasoning';
   if (PREFERENCE_INTENT.test(question)) return 'single-session-preference';
   if (KNOWLEDGE_UPDATE_INTENT.test(question)) return 'knowledge-update';

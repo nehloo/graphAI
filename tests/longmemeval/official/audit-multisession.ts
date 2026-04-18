@@ -64,11 +64,23 @@ function readJsonl<T>(path: string): T[] {
   return rows;
 }
 
-// Extract the first integer or decimal number from a string.
+const WORD_TO_NUM: Record<string, number> = {
+  zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7,
+  eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13,
+  fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18,
+  nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50,
+};
+
+// Extract the first number from a string — digit form first, then word form.
 function extractNumber(s: unknown): number | null {
   if (typeof s !== 'string') return null;
-  const m = s.match(/\b(\d+(?:\.\d+)?)\b/);
-  return m ? parseFloat(m[1]) : null;
+  const digitMatch = s.match(/\b(\d+(?:\.\d+)?)\b/);
+  if (digitMatch) return parseFloat(digitMatch[1]);
+  const lower = s.toLowerCase();
+  for (const [word, num] of Object.entries(WORD_TO_NUM)) {
+    if (new RegExp(`\\b${word}\\b`).test(lower)) return num;
+  }
+  return null;
 }
 
 // Is the predicted answer a "no context" / retrieval failure response?
