@@ -1,6 +1,6 @@
 # Graphnosis — Dual-Graph Knowledge System
 
-[![Benchmark](https://img.shields.io/badge/LongMemEval-74.80%25-e25822?style=flat)](https://github.com/nehloo/Graphnosis/blob/main/benchmarks/benchmarks.md)
+[![Benchmark](https://img.shields.io/badge/LongMemEval-76.40%25-e25822?style=flat)](https://github.com/nehloo/Graphnosis/blob/main/benchmarks/benchmarks.md)
 [![Website](https://img.shields.io/badge/website-graphnosis.vercel.app-blue?style=flat&logo=vercel)](https://graphnosis.vercel.app)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat)](https://github.com/nehloo/Graphnosis/blob/main/LICENSE)
@@ -232,24 +232,27 @@ Benchmarked on the Wikipedia dataset (12,199 nodes, 67,578 edges):
 
 ### LongMemEval — Official Benchmark
 
-**72.20%** end-to-end QA accuracy on the [official LongMemEval benchmark](https://github.com/xiaowu0162/LongMemEval) (500 questions, gpt-4o answer + gpt-4o judge, hybrid retrieval).
+**76.40%** end-to-end QA accuracy on the [official LongMemEval benchmark](https://github.com/xiaowu0162/LongMemEval) (500 questions, gpt-4o answer + gpt-4o judge, hybrid retrieval).
 
 | Category | Score |
 |---|---|
 | single-session-user | 95.31% (61/64) |
-| knowledge-update | 83.33% (60/72) |
-| single-session-assistant | 82.14% (46/56) |
-| temporal-reasoning | 70.08% (89/127) |
-| multi-session | 58.68% (71/121) |
-| single-session-preference | 26.67% (8/30) |
+| knowledge-update | 87.50% (63/72) |
+| single-session-assistant | 87.50% (49/56) |
+| temporal-reasoning | 71.65% (91/127) |
+| multi-session | 63.64% (77/121) |
+| single-session-preference | 43.33% (13/30) |
 
 **What got us here:**
 - Hybrid retrieval: TF-IDF graph traversal + semantic embeddings (text-embedding-3-small)
+- Question-type router with category-specific retrieval strategies and prompt blocks
+- Session summary nodes (gpt-4o-mini at ingest) for multi-session / temporal / knowledge-update questions
+- Query-time preference extraction (gpt-4o-mini) for single-session-preference questions
+- Multi-session aggregation routing: strong count-signal captured before temporal/KU patterns
+- Aggregation prompt distinguishes additions vs. superseded totals (sum vs. supersede logic)
 - Temporal grounding: date normalization, wider BFS subgraph for time-sensitive questions
 - Session-diverse seed selection to improve cross-session recall
 - Sibling-turn expansion to include conversational context around relevant turns
-- Preference prompting + semantic reranking for ambiguous queries
-- Aggregation-aware retrieval + prompt for multi-session questions (sum vs. supersede logic)
 - Upgraded answer model from gpt-4o-mini to gpt-4o
 
 **Leaderboard context** (end-to-end QA with official GPT-4 judge):
@@ -261,12 +264,76 @@ Benchmarked on the Wikipedia dataset (12,199 nodes, 67,578 edges):
 | OMEGA | 95.40% |
 | Mastra | 94.87% |
 | Supermemory | 85.86% |
-| **Graphnosis** | **72.20%** |
+| **Graphnosis** | **76.40%** |
 | Zep | 71.20% |
 
 > MemPalace's 96.6%/100% figures measure **retrieval recall R@5** (is the correct conversation session in the top 5 results?) — a different metric than end-to-end QA with a GPT-4 judge. Both are valid; they measure different things. This runner uses the verbatim official judge prompts from [xiaowu0162/LongMemEval](https://github.com/xiaowu0162/LongMemEval).
 
 For the full benchmark progression story — every iteration from first run to this result — see [benchmarks.md](benchmarks/benchmarks.md).
+
+## Graphnosis as AI Middleware (MCP Server)
+
+Graphnosis ships as a portable **MCP (Model Context Protocol) server** — drop-in knowledge-graph middleware for any LLM. Load a `.gai` file, ask a question, and receive a ~2K-token plain-text subgraph snippet ready to inject into any LLM's system prompt.
+
+### Two deployment modes
+
+**Mode 1 — Local / Claude Desktop** (stdio transport)
+
+Add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "graphnosis": {
+      "command": "node",
+      "args": ["/path/to/Graphnosis/node_modules/.bin/tsx", "src/mcp/server.ts"],
+      "cwd": "/path/to/Graphnosis",
+      "env": { "OPENAI_API_KEY": "sk-..." }
+    }
+  }
+}
+```
+
+Or run directly:
+
+```bash
+npm run mcp
+```
+
+**Mode 2 — Enterprise On-Premises** (HTTP transport, Docker)
+
+```bash
+docker compose up
+# MCP endpoint: http://internal-host:3001/mcp
+```
+
+Point any MCP-compatible client at your internal host. The `.gai` file stays on your mounted volume inside the enterprise perimeter. See [enterprise/enterprise.md](enterprise/enterprise.md) for the full security and privacy architecture.
+
+### MCP tools
+
+| Tool | What it does |
+|------|-------------|
+| `load_graph` | Load a `.gai` file into session memory |
+| `ingest_files` | Parse raw files → build graph → store in session |
+| `update_graph` | Add new documents to an existing session graph |
+| `query` | Ask a question → returns a ~2K plain-text subgraph snippet |
+| `export` | Write the session graph back to a `.gai` file |
+
+**Privacy guarantee:** `query` returns only the serialized subgraph text and a node count — never the full graph, raw node list, or binary file. Only the few hundred tokens relevant to your question ever leave the enterprise perimeter.
+
+### Why not just use Anthropic/OpenAI memory?
+
+Cloud-provider memory stores your knowledge on their infrastructure. Graphnosis keeps the graph on your machine or your servers — always.
+
+| | Graphnosis | Cloud-provider memory |
+|---|---|---|
+| **Graph location** | Your machine / enterprise servers | Provider infrastructure |
+| **LLM compatibility** | Any (Claude, GPT-4, Gemini, Ollama…) | Provider-locked |
+| **Privacy** | Full control | Data leaves perimeter |
+| **Format** | Open `.gai` (portable) | Proprietary |
+| **Self-hostable** | Yes | No |
+
+---
 
 ## Getting Started
 
